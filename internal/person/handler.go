@@ -56,6 +56,7 @@ type HTTPError struct {
 type PersonHandler struct {
 	repo   PersonRepository
 	logger *zap.Logger
+	cfg    *config.Config
 }
 
 // NewPersonHandler creates a new PersonHandler.
@@ -222,7 +223,7 @@ func (h *PersonHandler) Update(w http.ResponseWriter, r *http.Request) {
 		existing.Email = *req.Email
 	}
 	if req.Password != nil {
-		hashed, err := bcrypt.GenerateFromPassword([]byte(*req.Password), config.AppConfig.Encryption.Cost)
+		hashed, err := bcrypt.GenerateFromPassword([]byte(*req.Password), bcrypt.DefaultCost)
 		if err != nil {
 			h.errorResponse(w, http.StatusInternalServerError, "error hashing password")
 			return

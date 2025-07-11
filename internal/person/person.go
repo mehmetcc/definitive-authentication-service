@@ -7,7 +7,6 @@ import (
 	"net/mail"
 	"time"
 
-	"github.com/mehmetcc/definitive-authentication-service/config"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -84,7 +83,7 @@ func NewPerson(email, password string) (*Person, error) {
 		return nil, err
 	}
 
-	hashed, err := bcrypt.GenerateFromPassword([]byte(password), config.AppConfig.Encryption.Cost)
+	hashed, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, err
 	}

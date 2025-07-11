@@ -31,14 +31,19 @@ func main() {
 	logger, _ := zap.NewProduction()
 	defer logger.Sync()
 
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		logger.Error("failed to load config, reverting to default settings", zap.Error(err))
+	}
+
 	dsn := fmt.Sprintf(
 		"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
-		config.AppConfig.Database.Host,
-		config.AppConfig.Database.Port,
-		config.AppConfig.Database.User,
-		config.AppConfig.Database.Password,
-		config.AppConfig.Database.Name,
-		config.AppConfig.Database.SSLMode,
+		cfg.Database.Host,
+		cfg.Database.Port,
+		cfg.Database.User,
+		cfg.Database.Password,
+		cfg.Database.Name,
+		cfg.Database.SSLMode,
 	)
 
 	if err := db.Init(dsn, *logger); err != nil {
@@ -57,14 +62,14 @@ func main() {
 
 	personRouter := chi.NewRouter()
 	personHandler.RegisterRoutes(personRouter)
-	rootRouter.Mount(config.AppConfig.Server.BasePath, personRouter)
+	rootRouter.Mount(cfg.Server.BasePath, personRouter)
 
 	rootRouter.Get("/swagger/*", httpSwagger.Handler(
-		httpSwagger.URL(fmt.Sprintf("http://localhost:%d/swagger/doc.json", config.AppConfig.Server.Port)),
+		httpSwagger.URL(fmt.Sprintf("http://localhost:%d/swagger/doc.json", cfg.Server.Port)),
 	))
 
 	srv := &http.Server{
-		Addr:    fmt.Sprintf(":%d", config.AppConfig.Server.Port),
+		Addr:    fmt.Sprintf(":%d", cfg.Server.Port),
 		Handler: rootRouter,
 
 		ReadTimeout:  5 * time.Second,

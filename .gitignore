@@ -33,3 +33,6 @@ output.txt
 
 # OS-X specific
 .DS_Store
+
+# Swagger files
+/docs

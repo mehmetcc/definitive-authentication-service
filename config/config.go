@@ -31,17 +31,17 @@ type Config struct {
 	Database   Database
 }
 
-var AppConfig *Config
-
-func init() {
+func LoadConfig() (*Config, error) {
 	var err error
-	AppConfig, err = LoadConfig()
+	cfg, err := generate()
 	if err != nil {
-		panic(fmt.Errorf("failed to load app config: %w", err))
+		return nil, err
 	}
+
+	return cfg, nil
 }
 
-func LoadConfig() (*Config, error) {
+func generate() (*Config, error) {
 	_ = godotenv.Load()
 
 	viper.AutomaticEnv()
