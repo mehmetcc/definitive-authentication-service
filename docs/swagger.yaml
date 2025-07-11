@@ -1,0 +1,235 @@
+basePath: /api/v1
+definitions:
+  person.CreatePersonRequest:
+    properties:
+      email:
+        description: |-
+          Email address of the person
+          required: true
+          format: email
+        type: string
+      password:
+        description: |-
+          Plain-text password for the person
+          required: true
+          min length: 8
+        type: string
+    type: object
+  person.HTTPError:
+    properties:
+      error:
+        description: Error message
+        type: string
+    type: object
+  person.Person:
+    properties:
+      created_at:
+        type: string
+      email:
+        type: string
+      id:
+        type: integer
+      is_active:
+        type: boolean
+      role:
+        $ref: '#/definitions/person.Role'
+      updated_at:
+        type: string
+    type: object
+  person.Role:
+    enum:
+    - 0
+    - 1
+    type: integer
+    x-enum-varnames:
+    - Admin
+    - User
+  person.UpdatePersonRequest:
+    properties:
+      email:
+        description: |-
+          New email address of the person
+          format: email
+        type: string
+      password:
+        description: |-
+          New plain-text password for the person
+          min length: 8
+        type: string
+      role:
+        allOf:
+        - $ref: '#/definitions/person.Role'
+        description: |-
+          New role for the person (admin or user)
+          enum: [admin,user]
+          example: user
+    type: object
+host: localhost:666
+info:
+  contact:
+    email: i@dont.care
+    name: Not me
+  description: This is the definitive authentication service for user management.
+  license:
+    name: Do What The F*ck You Want To Public License
+    url: https://www.wtfpl.net/txt/copying/
+  title: Definitive Authentication Service API
+  version: "1.0"
+paths:
+  /persons:
+    post:
+      consumes:
+      - application/json
+      description: Create a new person with email, password, and role.
+      parameters:
+      - description: Create person payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/person.CreatePersonRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/person.Person'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/person.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/person.HTTPError'
+      summary: Create a new person
+      tags:
+      - persons
+  /persons/{id}:
+    delete:
+      description: Soft-delete a person by ID.
+      parameters:
+      - description: Person ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+          schema:
+            type: nil
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/person.HTTPError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/person.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/person.HTTPError'
+      summary: Delete a person
+      tags:
+      - persons
+    get:
+      description: Get a person by their unique ID.
+      parameters:
+      - description: Person ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/person.Person'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/person.HTTPError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/person.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/person.HTTPError'
+      summary: Retrieve a person by ID
+      tags:
+      - persons
+    put:
+      consumes:
+      - application/json
+      description: Update a person's email or password.
+      parameters:
+      - description: Person ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Update person payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/person.UpdatePersonRequest'
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+          schema:
+            type: nil
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/person.HTTPError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/person.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/person.HTTPError'
+      summary: Update a person
+      tags:
+      - persons
+  /persons/email/{email}:
+    get:
+      description: Get a person by their email address.
+      parameters:
+      - description: Person Email
+        in: path
+        name: email
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/person.Person'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/person.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/person.HTTPError'
+      summary: Retrieve a person by email
+      tags:
+      - persons
+swagger: "2.0"
