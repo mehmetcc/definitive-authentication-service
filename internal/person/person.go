@@ -127,6 +127,20 @@ func ValidatePassword(password string) error {
 	return nil
 }
 
+// SetPassword hashes and sets a new password on the Person.
+func (p *Person) SetPassword(password string, cost int) error {
+	// reuse your existing validation
+	if err := ValidatePassword(password); err != nil {
+		return err
+	}
+	hashed, err := bcrypt.GenerateFromPassword([]byte(password), cost)
+	if err != nil {
+		return err
+	}
+	p.Password = hashed
+	return nil
+}
+
 // Role defines the set of possible user roles.
 // swagger:model Role
 // enum: [admin, user]

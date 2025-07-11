@@ -11,7 +11,6 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/mehmetcc/definitive-authentication-service/config"
 	"go.uber.org/zap"
-	"golang.org/x/crypto/bcrypt"
 )
 
 // CreatePersonRequest represents the payload to create a new Person.
@@ -223,13 +222,12 @@ func (h *PersonHandler) Update(w http.ResponseWriter, r *http.Request) {
 		existing.Email = *req.Email
 	}
 	if req.Password != nil {
-		hashed, err := bcrypt.GenerateFromPassword([]byte(*req.Password), h.cfg.Encryption.Cost)
-		if err != nil {
-			h.errorResponse(w, http.StatusInternalServerError, "error hashing password")
+		if err := existing.SetPassword(*req.Password, h.cfg.Encryption.Cost); err != nil {
+			h.errorResponse(w, http.StatusInternalServerError, fmt.Sprintf("error setting password: %v", err))
 			return
 		}
-		existing.Password = hashed
 	}
+
 	if req.Role != nil {
 		existing.Role = *req.Role
 	}
