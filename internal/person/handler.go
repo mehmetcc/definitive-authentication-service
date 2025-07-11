@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/mehmetcc/definitive-authentication-service/config"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -56,7 +55,6 @@ type HTTPError struct {
 type PersonHandler struct {
 	repo   PersonRepository
 	logger *zap.Logger
-	cfg    *config.Config
 }
 
 // NewPersonHandler creates a new PersonHandler.
