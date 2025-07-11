@@ -79,36 +79,22 @@ type Person struct {
 //	      error:
 //	        type: string
 func NewPerson(email, password string, cost int) (*Person, error) {
-	if err := validate(email, password); err != nil {
-		return nil, err
-	}
-
-	hashed, err := bcrypt.GenerateFromPassword([]byte(password), cost)
-	if err != nil {
+	if err := ValidateEmail(email); err != nil {
 		return nil, err
 	}
 
 	now := time.Now().UTC()
-	return &Person{
+	p := &Person{
 		Email:     email,
-		Password:  hashed,
-		Role:      User, // default to user role
+		Role:      User, // default to user
 		CreatedAt: now,
 		UpdatedAt: now,
 		IsActive:  true,
-	}, nil
-}
-
-func validate(email, password string) error {
-	for _, err := range []error{
-		ValidateEmail(email),
-		ValidatePassword(password),
-	} {
-		if err != nil {
-			return err
-		}
 	}
-	return nil
+	if err := p.SetPassword(password, cost); err != nil {
+		return nil, err
+	}
+	return p, nil
 }
 
 // ValidateEmail ensures the email is in a valid format.
@@ -129,7 +115,6 @@ func ValidatePassword(password string) error {
 
 // SetPassword hashes and sets a new password on the Person.
 func (p *Person) SetPassword(password string, cost int) error {
-	// reuse your existing validation
 	if err := ValidatePassword(password); err != nil {
 		return err
 	}
