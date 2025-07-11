@@ -78,12 +78,12 @@ type Person struct {
 //	    properties:
 //	      error:
 //	        type: string
-func NewPerson(email, password string) (*Person, error) {
+func NewPerson(email, password string, cost int) (*Person, error) {
 	if err := validate(email, password); err != nil {
 		return nil, err
 	}
 
-	hashed, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	hashed, err := bcrypt.GenerateFromPassword([]byte(password), cost)
 	if err != nil {
 		return nil, err
 	}

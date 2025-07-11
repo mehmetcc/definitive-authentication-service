@@ -51,7 +51,7 @@ func main() {
 	}
 
 	personRepo := person.NewPersonRepository(db.DB, logger)
-	personHandler := person.NewPersonHandler(personRepo, logger)
+	personHandler := person.NewPersonHandler(personRepo, logger, cfg)
 
 	rootRouter := chi.NewRouter()
 	rootRouter.Use(middleware.RequestID)

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/mehmetcc/definitive-authentication-service/config"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -55,11 +56,12 @@ type HTTPError struct {
 type PersonHandler struct {
 	repo   PersonRepository
 	logger *zap.Logger
+	cfg    *config.Config
 }
 
 // NewPersonHandler creates a new PersonHandler.
-func NewPersonHandler(r PersonRepository, l *zap.Logger) *PersonHandler {
-	return &PersonHandler{repo: r, logger: l}
+func NewPersonHandler(r PersonRepository, l *zap.Logger, cfg *config.Config) *PersonHandler {
+	return &PersonHandler{repo: r, logger: l, cfg: cfg}
 }
 
 // RegisterRoutes registers /persons endpoints (BasePath is applied at the router root).
@@ -104,7 +106,7 @@ func (h *PersonHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	p, err := NewPerson(req.Email, req.Password)
+	p, err := NewPerson(req.Email, req.Password, h.cfg.Encryption.Cost)
 	if err != nil {
 		h.errorResponse(w, http.StatusBadRequest, fmt.Sprintf("validation error: %v", err))
 		return
@@ -221,7 +223,7 @@ func (h *PersonHandler) Update(w http.ResponseWriter, r *http.Request) {
 		existing.Email = *req.Email
 	}
 	if req.Password != nil {
-		hashed, err := bcrypt.GenerateFromPassword([]byte(*req.Password), bcrypt.DefaultCost)
+		hashed, err := bcrypt.GenerateFromPassword([]byte(*req.Password), h.cfg.Encryption.Cost)
 		if err != nil {
 			h.errorResponse(w, http.StatusInternalServerError, "error hashing password")
 			return
