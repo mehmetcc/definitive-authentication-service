@@ -53,10 +53,13 @@ func main() {
 	router.Use(gin.Logger(), gin.Recovery())
 
 	// swagger endpoint
-	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+	authorized := router.Group("/", gin.BasicAuth(gin.Accounts{
+		cfg.Admin.Username: cfg.Admin.Password,
+	}))
+	authorized.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	// health check endpoint
-	router.GET("/healthz", func(c *gin.Context) {
+	router.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
 

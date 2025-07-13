@@ -23,13 +23,23 @@ type ServerConfig struct {
 	Port string
 }
 
+type AdminConfig struct {
+	Username string
+	Password string
+}
+
 type Config struct {
 	Database *DatabaseConfig
 	Server   *ServerConfig
+	Admin    *AdminConfig
 }
 
 func LoadConfig(dotenvPath string) (*Config, error) {
-	_ = godotenv.Load(dotenvPath)
+	err := godotenv.Load(dotenvPath)
+	if err != nil {
+		return nil, err
+	}
+
 	dbCfg := &DatabaseConfig{
 		PostgresUser:     os.Getenv("POSTGRES_USER"),
 		PostgresPassword: os.Getenv("POSTGRES_PASSWORD"),
@@ -38,7 +48,11 @@ func LoadConfig(dotenvPath string) (*Config, error) {
 	serverCgf := &ServerConfig{
 		Port: os.Getenv("SERVER_PORT"),
 	}
+	adminCfg := &AdminConfig{
+		Username: os.Getenv("ADMIN_USERNAME"),
+		Password: os.Getenv("ADMIN_PASSWORD"),
+	}
 
-	cfg := &Config{dbCfg, serverCgf}
+	cfg := &Config{dbCfg, serverCgf, adminCfg}
 	return cfg, nil
 }
