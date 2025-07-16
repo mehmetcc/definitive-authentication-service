@@ -3,7 +3,6 @@ package authentication
 import (
 	"context"
 	"errors"
-	"fmt"
 	"time"
 
 	"gorm.io/gorm"
@@ -57,13 +56,13 @@ func (r *recordRepository) Rotate(
 				return ErrRecordNotFoundByGivenToken
 			}
 			if err != nil {
-				return fmt.Errorf("%w: %v", ErrUnresponsiveDatabase, err)
+				return ErrUnresponsiveDatabase
 			}
 
 			rec.RefreshToken = newToken
 			rec.ExpiresAt = newExpiry
 			if err := tx.Save(&rec).Error; err != nil {
-				return fmt.Errorf("%w: %v", ErrUnresponsiveDatabase, err)
+				return ErrUnresponsiveDatabase
 			}
 			return nil
 		})
@@ -104,7 +103,7 @@ func (r *recordRepository) ReadByID(ctx context.Context, id uint) (*RefreshToken
 func (r *recordRepository) Delete(ctx context.Context, id uint) error {
 	res := r.db.WithContext(ctx).Delete(&RefreshTokenRecord{}, id)
 	if res.Error != nil {
-		return fmt.Errorf("%w: %v", ErrUnresponsiveDatabase, res.Error)
+		return ErrUnresponsiveDatabase
 	}
 	if res.RowsAffected == 0 {
 		return ErrRecordNotFoundByGivenID
@@ -115,7 +114,7 @@ func (r *recordRepository) Delete(ctx context.Context, id uint) error {
 func (r *recordRepository) DeleteByToken(ctx context.Context, token string) error {
 	res := r.db.WithContext(ctx).Where("refresh_token = ?", token).Delete(&RefreshTokenRecord{})
 	if res.Error != nil {
-		return fmt.Errorf("%w: %v", ErrUnresponsiveDatabase, res.Error)
+		return ErrUnresponsiveDatabase
 	}
 	if res.RowsAffected == 0 {
 		return ErrRecordNotFoundByGivenToken
@@ -126,7 +125,7 @@ func (r *recordRepository) DeleteByToken(ctx context.Context, token string) erro
 func (r *recordRepository) DeleteByPersonID(ctx context.Context, personID uint) error {
 	res := r.db.WithContext(ctx).Where("person_id = ?", personID).Delete(&RefreshTokenRecord{})
 	if res.Error != nil {
-		return fmt.Errorf("%w: %v", ErrUnresponsiveDatabase, res.Error)
+		return ErrUnresponsiveDatabase
 	}
 	if res.RowsAffected == 0 {
 		return ErrRecordNotFoundByGivenPersonID
