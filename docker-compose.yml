@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:16
@@ -25,20 +23,10 @@ services:
     networks:
       - authnet
 
-  redis:
-    image: redis:7
-    restart: always
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    networks:
-      - authnet
 
 volumes:
   postgres_data:
   pgadmin_data:
-  redis_data:
 
 networks:
   authnet:

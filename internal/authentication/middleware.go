@@ -61,3 +61,19 @@ func AuthMiddleware(personService person.PersonService, accessSecret string, log
 		c.Next()
 	}
 }
+
+func RoleMiddleware(requiredRole person.Role, logger *zap.Logger) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		raw, exists := c.Get(person.ContextUserKey)
+		if !exists {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+			return
+		}
+		user := raw.(*person.Person)
+		if user.Role != requiredRole {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+			return
+		}
+		c.Next()
+	}
+}

@@ -3,6 +3,7 @@ package authentication
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"gorm.io/gorm"
@@ -36,9 +37,13 @@ func NewRecordRepository(db *gorm.DB) RecordRepository {
 }
 
 func (r *recordRepository) Create(ctx context.Context, record *RefreshTokenRecord) error {
-	return r.db.WithContext(ctx).Create(record).Error
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(record).Error; err != nil {
+			return fmt.Errorf("failed to create refresh token record: %w", err)
+		}
+		return nil
+	})
 }
-
 func (r *recordRepository) Rotate(
 	ctx context.Context,
 	oldToken, newToken string,

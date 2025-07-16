@@ -99,22 +99,9 @@ func main() {
 	})
 
 	adminGroup := api.Group("/")
-	adminGroup.Use(
-		authentication.AuthMiddleware(personService, cfg.Token.AccessTokenSecret, logger),
-		func(c *gin.Context) {
-			raw, exists := c.Get(person.ContextUserKey)
-			if !exists {
-				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
-				return
-			}
-			user := raw.(*person.Person)
-			if user.Role != person.Admin {
-				c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "forbidden"})
-				return
-			}
-			c.Next()
-		},
-	)
+	adminGroup.Use(authentication.AuthMiddleware(personService,
+		cfg.Token.AccessTokenSecret, logger),
+		authentication.RoleMiddleware(person.Admin, logger))
 	person.NewPersonHandler(adminGroup, personService, logger)
 
 	//
