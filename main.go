@@ -75,7 +75,7 @@ func main() {
 		logger,
 		// access token settings
 		cfg.Token.AccessTokenSecret,
-		15*time.Minute,
+		time.Duration(cfg.Token.AccessTokenExpiry)*time.Minute,
 		// refresh token settings
 		cfg.Token.RefreshTokenSecret,
 		time.Duration(cfg.Token.RefreshTokenExpiry)*time.Hour,

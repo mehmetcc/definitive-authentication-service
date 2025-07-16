@@ -38,6 +38,7 @@ type TokenConfig struct {
 	AccessTokenSecret  string
 	RefreshTokenSecret string
 	RefreshTokenExpiry int // in hours
+	AccessTokenExpiry  int // in minutes
 }
 
 type Config struct {
@@ -72,6 +73,13 @@ func LoadConfig(dotenvPath string) (*Config, error) {
 			expiry, err := strconv.Atoi(os.Getenv("REFRESH_TOKEN_EXPIRY"))
 			if err != nil {
 				return 24 // default to 24 hours if parsing fails
+			}
+			return expiry
+		}(),
+		AccessTokenExpiry: func() int {
+			expiry, err := strconv.Atoi(os.Getenv("REFRESH_TOKEN_EXPIRY"))
+			if err != nil {
+				return 24 // default to 2 minutes if parsing fails
 			}
 			return expiry
 		}(),
