@@ -2,6 +2,7 @@ package utils
 
 import (
 	"os"
+	"strconv"
 
 	"github.com/joho/godotenv"
 )
@@ -28,10 +29,17 @@ type AdminConfig struct {
 	Password string
 }
 
+type TokenConfig struct {
+	AccessTokenSecret  string
+	RefreshTokenSecret string
+	RefreshTokenExpiry int // in hours
+}
+
 type Config struct {
 	Database *DatabaseConfig
 	Server   *ServerConfig
 	Admin    *AdminConfig
+	Token    *TokenConfig
 }
 
 func LoadConfig(dotenvPath string) (*Config, error) {
@@ -52,7 +60,18 @@ func LoadConfig(dotenvPath string) (*Config, error) {
 		Username: os.Getenv("ADMIN_USERNAME"),
 		Password: os.Getenv("ADMIN_PASSWORD"),
 	}
+	tokenCfg := &TokenConfig{
+		AccessTokenSecret:  os.Getenv("ACCESS_TOKEN_SECRET"),
+		RefreshTokenSecret: os.Getenv("REFRESH_TOKEN_SECRET"),
+		RefreshTokenExpiry: func() int {
+			expiry, err := strconv.Atoi(os.Getenv("REFRESH_TOKEN_EXPIRY"))
+			if err != nil {
+				return 24 // default to 24 hours if parsing fails
+			}
+			return expiry
+		}(),
+	}
 
-	cfg := &Config{dbCfg, serverCgf, adminCfg}
+	cfg := &Config{dbCfg, serverCgf, adminCfg, tokenCfg}
 	return cfg, nil
 }

@@ -15,7 +15,7 @@ var (
 	ErrPersonNotCreated     = errors.New("person not created")
 	ErrPersonNotUpdated     = errors.New("person not updated")
 	ErrPersonNotDeleted     = errors.New("person not deleted")
-	ErrUnresponsiveDatabase = errors.New("unresponsive database")
+	ErrUnresponsiveDatabase = errors.New("error occured during writing to persons table")
 )
 
 type PersonRepository interface {

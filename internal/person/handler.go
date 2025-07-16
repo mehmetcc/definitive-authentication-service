@@ -8,6 +8,9 @@ import (
 	"go.uber.org/zap"
 )
 
+// ContextUserKey is the key under which the authenticated Person is stored in Gin context.
+const ContextUserKey = "user"
+
 // CreatePersonRequest represents the payload for creating a new person.
 // @Description payload to register a new person
 // @Property email body string true "unique email address"
@@ -71,6 +74,24 @@ func (h *PersonHandler) bindID(c *gin.Context) (uint, bool) {
 		return 0, false
 	}
 	return uri.ID, true
+}
+
+// ReadCurrentPerson returns the authenticated user from context.
+// @Summary      Get current user
+// @Description  Fetch the “me” record for the authenticated user
+// @Tags         persons
+// @Produce      json
+// @Success      200 {object} Person
+// @Failure      401 {object} map[string]string
+// @Router       /persons/me [get]
+func (h *PersonHandler) ReadCurrentPerson(c *gin.Context) {
+	raw, exists := c.Get(ContextUserKey)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	user := raw.(*Person)
+	c.JSON(http.StatusOK, user)
 }
 
 // CreatePerson godoc

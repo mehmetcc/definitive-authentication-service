@@ -11,7 +11,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
-      - appnet
+      - authnet
 
   pgadmin:
     image: dpage/pgadmin4
@@ -23,12 +23,23 @@ services:
     volumes:
       - pgadmin_data:/var/lib/pgadmin
     networks:
-      - appnet
+      - authnet
+
+  redis:
+    image: redis:7
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - authnet
 
 volumes:
   postgres_data:
   pgadmin_data:
+  redis_data:
 
 networks:
-  appnet:
+  authnet:
     driver: bridge
