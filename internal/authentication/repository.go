@@ -44,6 +44,7 @@ func (r *recordRepository) Create(ctx context.Context, record *RefreshTokenRecor
 		return nil
 	})
 }
+
 func (r *recordRepository) Rotate(
 	ctx context.Context,
 	oldToken, newToken string,
@@ -54,7 +55,9 @@ func (r *recordRepository) Rotate(
 		Transaction(func(tx *gorm.DB) error {
 			var rec RefreshTokenRecord
 			err := tx.
-				Where("refresh_token = ?", oldToken).
+				Joins("JOIN persons ON persons.id = refresh_token_records.person_id").
+				Where("refresh_token_records.refresh_token = ?", oldToken).
+				Where("persons.deleted_at IS NULL").
 				First(&rec).
 				Error
 			if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -76,7 +79,9 @@ func (r *recordRepository) Rotate(
 func (r *recordRepository) ReadByToken(ctx context.Context, token string) (*RefreshTokenRecord, error) {
 	var record RefreshTokenRecord
 	err := r.db.WithContext(ctx).
-		Where("refresh_token = ?", token).
+		Joins("JOIN persons ON persons.id = refresh_token_records.person_id").
+		Where("refresh_token_records.refresh_token = ?", token).
+		Where("persons.deleted_at IS NULL").
 		First(&record).
 		Error
 
@@ -93,7 +98,10 @@ func (r *recordRepository) ReadByToken(ctx context.Context, token string) (*Refr
 func (r *recordRepository) ReadByID(ctx context.Context, id uint) (*RefreshTokenRecord, error) {
 	var record RefreshTokenRecord
 	err := r.db.WithContext(ctx).
-		First(&record, id).
+		Joins("JOIN persons ON persons.id = refresh_token_records.person_id").
+		Where("refresh_token_records.id = ?", id).
+		Where("persons.deleted_at IS NULL").
+		First(&record).
 		Error
 
 	if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -106,7 +114,11 @@ func (r *recordRepository) ReadByID(ctx context.Context, id uint) (*RefreshToken
 }
 
 func (r *recordRepository) Delete(ctx context.Context, id uint) error {
-	res := r.db.WithContext(ctx).Delete(&RefreshTokenRecord{}, id)
+	res := r.db.WithContext(ctx).
+		Joins("JOIN persons ON persons.id = refresh_token_records.person_id").
+		Where("refresh_token_records.id = ?", id).
+		Where("persons.deleted_at IS NULL").
+		Delete(&RefreshTokenRecord{})
 	if res.Error != nil {
 		return ErrUnresponsiveDatabase
 	}
@@ -117,7 +129,11 @@ func (r *recordRepository) Delete(ctx context.Context, id uint) error {
 }
 
 func (r *recordRepository) DeleteByToken(ctx context.Context, token string) error {
-	res := r.db.WithContext(ctx).Where("refresh_token = ?", token).Delete(&RefreshTokenRecord{})
+	res := r.db.WithContext(ctx).
+		Joins("JOIN persons ON persons.id = refresh_token_records.person_id").
+		Where("refresh_token_records.refresh_token = ?", token).
+		Where("persons.deleted_at IS NULL").
+		Delete(&RefreshTokenRecord{})
 	if res.Error != nil {
 		return ErrUnresponsiveDatabase
 	}
@@ -128,12 +144,18 @@ func (r *recordRepository) DeleteByToken(ctx context.Context, token string) erro
 }
 
 func (r *recordRepository) DeleteByPersonID(ctx context.Context, personID uint) error {
-	res := r.db.WithContext(ctx).Where("person_id = ?", personID).Delete(&RefreshTokenRecord{})
-	if res.Error != nil {
-		return ErrUnresponsiveDatabase
-	}
-	if res.RowsAffected == 0 {
-		return ErrRecordNotFoundByGivenPersonID
-	}
-	return nil
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		res := tx.
+			Joins("JOIN persons ON persons.id = refresh_token_records.person_id").
+			Where("refresh_token_records.person_id = ?", personID).
+			Where("persons.deleted_at IS NULL").
+			Delete(&RefreshTokenRecord{})
+		if res.Error != nil {
+			return ErrUnresponsiveDatabase
+		}
+		if res.RowsAffected == 0 {
+			return ErrRecordNotFoundByGivenPersonID
+		}
+		return nil
+	})
 }

@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	_ "github.com/mehmetcc/definitive-authentication-service/docs"
 	swaggerFiles "github.com/swaggo/files"
@@ -88,21 +89,19 @@ func main() {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
 
-	authGroup := api.Group("/")
-	authGroup.Use(
-		authentication.AuthMiddleware(personService, cfg.Token.AccessTokenSecret, logger),
-	)
-	authGroup.GET("/persons/me", func(c *gin.Context) {
-		raw, _ := c.Get(person.ContextUserKey)
-		user := raw.(*person.Person)
-		c.JSON(http.StatusOK, user)
-	})
-
 	adminGroup := api.Group("/")
 	adminGroup.Use(authentication.AuthMiddleware(personService,
 		cfg.Token.AccessTokenSecret, logger),
 		authentication.RoleMiddleware(person.Admin, logger))
-	person.NewPersonHandler(adminGroup, personService, logger)
+	personHandler := person.NewPersonHandler(adminGroup, personService, logger)
+
+	authGroup := api.Group("/")
+	authGroup.Use(
+		authentication.AuthMiddleware(personService, cfg.Token.AccessTokenSecret, logger),
+	)
+	authGroup.GET("/persons/me", personHandler.ReadCurrentPerson)
+
+	router.Use(cors.Default())
 
 	//
 	// START SERVER
