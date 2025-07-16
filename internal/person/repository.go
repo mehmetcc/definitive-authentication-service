@@ -37,6 +37,7 @@ func NewPersonRepository(db *gorm.DB) PersonRepository {
 func (p *personRepository) ReadByID(ctx context.Context, id uint) (*Person, error) {
 	var person Person
 	err := p.db.WithContext(ctx).
+		Where("deleted_at IS NULL").
 		First(&person, id).
 		Error
 
@@ -66,6 +67,7 @@ func (p *personRepository) ReadByEmail(ctx context.Context, email string) (*Pers
 	var person Person
 	err := p.db.WithContext(ctx).
 		Where("email = ?", email).
+		Where("deleted_at IS NULL").
 		First(&person).
 		Error
 
