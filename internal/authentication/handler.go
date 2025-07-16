@@ -1,9 +1,14 @@
+// internal/authentication/handler.go
 package authentication
 
 import (
 	"errors"
 	"net/http"
+	"time"
 
+	tollbooth "github.com/didip/tollbooth/v7"
+	limiter "github.com/didip/tollbooth/v7/limiter"
+	tollbooth_gin "github.com/didip/tollbooth_gin"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 )
@@ -37,12 +42,34 @@ type AuthHandler struct {
 	logger  *zap.Logger
 }
 
-// NewAuthHandler registers auth endpoints on the given router group.
+// NewAuthHandler registers auth endpoints on the given router group,
+// with rate limiting applied to login, refresh, and logout.
 func NewAuthHandler(router *gin.RouterGroup, service AuthenticationService, logger *zap.Logger) *AuthHandler {
 	h := &AuthHandler{router: router, service: service, logger: logger}
-	h.router.POST("/auth/login", h.Login)
-	h.router.POST("/auth/refresh", h.Refresh)
-	h.router.POST("/auth/logout", h.Logout)
+
+	// 5 requests per minute limiter
+	authLimiter := tollbooth.NewLimiter(5, &limiter.ExpirableOptions{
+		DefaultExpirationTTL: time.Minute,
+	})
+
+	h.router.POST(
+		"/auth/login",
+		tollbooth_gin.LimitHandler(authLimiter),
+		h.Login,
+	)
+
+	h.router.POST(
+		"/auth/refresh",
+		tollbooth_gin.LimitHandler(authLimiter),
+		h.Refresh,
+	)
+
+	h.router.POST(
+		"/auth/logout",
+		tollbooth_gin.LimitHandler(authLimiter),
+		h.Logout,
+	)
+
 	return h
 }
 
