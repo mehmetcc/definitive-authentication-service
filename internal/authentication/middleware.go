@@ -13,7 +13,7 @@ import (
 	"github.com/mehmetcc/definitive-authentication-service/internal/utils"
 )
 
-func AuthMiddleware(personService person.PersonService, jwtSecret string, logger *zap.Logger) gin.HandlerFunc {
+func AuthMiddleware(personService person.PersonService, accessSecret string, logger *zap.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
@@ -28,11 +28,11 @@ func AuthMiddleware(personService person.PersonService, jwtSecret string, logger
 		}
 		rawToken := parts[1]
 
-		// Parse and validate JWT
-		claims, err := utils.ParseToken(rawToken, jwtSecret)
+		// Parse and validate access JWT
+		claims, err := utils.ParseAccessToken(rawToken, accessSecret)
 		if err != nil {
-			logger.Warn("token parse failed", zap.Error(err))
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired token"})
+			logger.Warn("access token parse failed", zap.Error(err))
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired access token"})
 			return
 		}
 

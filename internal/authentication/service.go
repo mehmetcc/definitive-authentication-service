@@ -23,151 +23,157 @@ var (
 
 type AuthenticationService interface {
 	Login(ctx context.Context, email, password string) (accessToken, refreshToken string, err error)
-	Refresh(ctx context.Context, oldRefreshToken string) (newAccessToken, newRefreshToken string, err error)
-	Logout(ctx context.Context, refreshToken string) error
+	Refresh(ctx context.Context, refreshJWT string) (newAccessToken, newRefreshToken string, err error)
+	Logout(ctx context.Context, refreshJWT string) error
 }
 
 type authenticationService struct {
 	personService   person.PersonService
 	recordRepo      RecordRepository
 	logger          *zap.Logger
-	jwtSecret       string
+	accessSecret    string
+	refreshSecret   string
 	accessTokenTTL  time.Duration
 	refreshTokenTTL time.Duration
 }
 
-func NewAuthenticationService(personService person.PersonService,
+func NewAuthenticationService(
+	personService person.PersonService,
 	recordRepo RecordRepository,
 	logger *zap.Logger,
-	jwtSecret string,
-	accessTokenTTL, refreshTokenTTL time.Duration) AuthenticationService {
+	accessSecret string,
+	accessTTL time.Duration,
+	refreshSecret string,
+	refreshTTL time.Duration,
+) AuthenticationService {
 	return &authenticationService{
 		personService:   personService,
 		recordRepo:      recordRepo,
 		logger:          logger,
-		jwtSecret:       jwtSecret,
-		accessTokenTTL:  accessTokenTTL,
-		refreshTokenTTL: refreshTokenTTL,
+		accessSecret:    accessSecret,
+		refreshSecret:   refreshSecret,
+		accessTokenTTL:  accessTTL,
+		refreshTokenTTL: refreshTTL,
 	}
 }
 
-func (a *authenticationService) Login(ctx context.Context, email string, password string) (accessToken string, refreshToken string, err error) {
+func (a *authenticationService) Login(ctx context.Context, email, password string) (string, string, error) {
 	user, err := a.personService.ReadPersonByEmail(ctx, email)
 	if err != nil {
 		if errors.Is(err, person.ErrPersonNotFound) {
-			a.logger.Error("ReadPersonByEmail failed: person not found", zap.Error(err), zap.String("email", email))
 			return "", "", ErrInvalidCredentials
 		}
-		a.logger.Error("ReadPersonByEmail failed", zap.Error(err), zap.String("email", email))
 		return "", "", ErrLoginFailed
 	}
 	if bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)) != nil {
-		a.logger.Error("password comparison failed", zap.String("email", email))
 		return "", "", ErrInvalidCredentials
 	}
 
-	accessToken, err = utils.IssueToken(
+	// 1) Issue Access Token
+	accessJWT, err := utils.IssueAccessToken(
 		strconv.Itoa(int(user.ID)),
 		user.Role,
-		a.jwtSecret,
+		a.accessSecret,
 		a.accessTokenTTL,
 	)
 	if err != nil {
-		a.logger.Error("IssueToken failed", zap.Error(err), zap.Uint("userID", user.ID))
 		return "", "", err
 	}
 
-	rawRefresh := uuid.NewString()
-	sum := sha256.Sum256([]byte(rawRefresh))
-	hashed := hex.EncodeToString(sum[:])
+	// 2) Issue Refresh Token (JWT)
+	jti := uuid.NewString()
+	refreshJWT, err := utils.IssueRefreshToken(
+		strconv.Itoa(int(user.ID)),
+		jti,
+		a.refreshSecret,
+		a.refreshTokenTTL,
+	)
+	if err != nil {
+		return "", "", err
+	}
+
+	// 3) Store hashed JTI in DB
+	hash := sha256.Sum256([]byte(jti))
 	rec := &RefreshTokenRecord{
 		PersonID:     user.ID,
-		RefreshToken: hashed,
+		RefreshToken: hex.EncodeToString(hash[:]),
 		ExpiresAt:    time.Now().Add(a.refreshTokenTTL),
 	}
 	if err := a.recordRepo.Create(ctx, rec); err != nil {
-		a.logger.Error("create refresh token record failed", zap.Error(err), zap.Uint("userID", user.ID))
 		return "", "", err
 	}
 
-	go func(userID uint) {
-		ctx := context.Background()
-		for i := 0; i < 3; i++ {
-			err := a.personService.UpdateLastSeen(ctx, userID)
-			if err == nil {
-				break
-			}
-			a.logger.Error("last seen update failed", zap.Error(err), zap.Int("attempt", i+1), zap.Uint("userID", userID))
-			time.Sleep(100 * time.Millisecond)
-		}
-	}(user.ID)
-
-	return accessToken, rawRefresh, nil
+	return accessJWT, refreshJWT, nil
 }
 
-func (a *authenticationService) Logout(ctx context.Context, refreshToken string) error {
-	sum := sha256.Sum256([]byte(refreshToken))
-	hashed := hex.EncodeToString(sum[:])
-
-	if err := a.recordRepo.DeleteByToken(ctx, hashed); err != nil {
-		if errors.Is(err, ErrRecordNotFoundByGivenToken) {
-			a.logger.Warn("token not found", zap.String("token", refreshToken))
-			return ErrInvalidRefreshToken
-		}
-		a.logger.Error("logout failed", zap.Error(err))
-		return err
-	}
-	return nil
-}
-
-func (a *authenticationService) Refresh(
-	ctx context.Context,
-	oldRefreshToken string,
-) (newAccessToken, newRefreshToken string, err error) {
-	sumOld := sha256.Sum256([]byte(oldRefreshToken))
-	hashedOld := hex.EncodeToString(sumOld[:])
-
-	rec, err := a.recordRepo.ReadByToken(ctx, hashedOld)
+func (a *authenticationService) Refresh(ctx context.Context, refreshJWT string) (string, string, error) {
+	// 1) Parse & validate incoming refresh JWT
+	claims, err := utils.ParseRefreshToken(refreshJWT, a.refreshSecret)
 	if err != nil {
-		if errors.Is(err, ErrRecordNotFoundByGivenToken) {
-			a.logger.Warn("token not found", zap.String("token", oldRefreshToken))
-			return "", "", ErrInvalidRefreshToken
-		}
-		a.logger.Error("repo error", zap.Error(err))
-		return "", "", ErrLoginFailed
-	}
-
-	if time.Now().After(rec.ExpiresAt) {
-		a.logger.Warn("token expired", zap.String("token", oldRefreshToken))
-		_ = a.recordRepo.DeleteByToken(ctx, hashedOld)
 		return "", "", ErrInvalidRefreshToken
 	}
 
-	user, err := a.personService.ReadPersonByID(ctx, rec.PersonID)
+	// 2) Look up JTI in DB
+	hash := sha256.Sum256([]byte(claims.ID))
+	rec, err := a.recordRepo.ReadByToken(ctx, hex.EncodeToString(hash[:]))
 	if err != nil {
-		a.logger.Error("could not load person", zap.Error(err), zap.Uint("userID", rec.PersonID))
-		return "", "", ErrLoginFailed
+		return "", "", ErrInvalidRefreshToken
 	}
 
-	newAccessToken, err = utils.IssueToken(
+	// 3) Check DB‐record expiry
+	if time.Now().After(rec.ExpiresAt) {
+		_ = a.recordRepo.DeleteByToken(ctx, hex.EncodeToString(hash[:]))
+		return "", "", ErrInvalidRefreshToken
+	}
+
+	// 4) Issue new Access Token
+	userID := rec.PersonID
+	user, err := a.personService.ReadPersonByID(ctx, userID)
+	if err != nil {
+		return "", "", ErrLoginFailed
+	}
+	accessJWT, err := utils.IssueAccessToken(
 		strconv.Itoa(int(user.ID)),
 		user.Role,
-		a.jwtSecret,
+		a.accessSecret,
 		a.accessTokenTTL,
 	)
 	if err != nil {
-		a.logger.Error("token can't be issued", zap.Error(err), zap.Uint("userID", user.ID))
+		return "", "", err
+	}
+
+	// 5) Rotate Refresh Token: new JWT + DB update
+	newJTI := uuid.NewString()
+	newRefreshJWT, err := utils.IssueRefreshToken(
+		strconv.Itoa(int(user.ID)),
+		newJTI,
+		a.refreshSecret,
+		a.refreshTokenTTL,
+	)
+	if err != nil {
+		return "", "", err
+	}
+	newHash := sha256.Sum256([]byte(newJTI))
+	if err := a.recordRepo.Rotate(
+		ctx,
+		hex.EncodeToString(hash[:]),
+		hex.EncodeToString(newHash[:]),
+		time.Now().Add(a.refreshTokenTTL),
+	); err != nil {
 		return "", "", ErrLoginFailed
 	}
 
-	rawNew := uuid.NewString()
-	sumNew := sha256.Sum256([]byte(rawNew))
-	hashedNew := hex.EncodeToString(sumNew[:])
-	newExpiry := time.Now().Add(a.refreshTokenTTL)
+	return accessJWT, newRefreshJWT, nil
+}
 
-	if err := a.recordRepo.Rotate(ctx, hashedOld, hashedNew, newExpiry); err != nil {
-		a.logger.Error("token rotate error", zap.Error(err))
-		return "", "", ErrLoginFailed
+func (a *authenticationService) Logout(ctx context.Context, refreshJWT string) error {
+	claims, err := utils.ParseRefreshToken(refreshJWT, a.refreshSecret)
+	if err != nil {
+		return ErrInvalidRefreshToken
 	}
-	return newAccessToken, rawNew, nil
+	hash := sha256.Sum256([]byte(claims.ID))
+	if err := a.recordRepo.DeleteByToken(ctx, hex.EncodeToString(hash[:])); err != nil {
+		return ErrInvalidRefreshToken
+	}
+	return nil
 }

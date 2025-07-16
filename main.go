@@ -59,37 +59,35 @@ func main() {
 	swaggerGroup := router.Group("/swagger", gin.BasicAuth(gin.Accounts{
 		cfg.Admin.Username: cfg.Admin.Password,
 	}))
-	// serve Swagger UI at both /swagger and /swagger/*
 	swaggerGroup.GET("", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	swaggerGroup.GET("/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	//
 	// WIRE UP SERVICES
 	//
-	// Person
 	personRepo := person.NewPersonRepository(db)
 	personService := person.NewPersonService(personRepo, logger)
-	// Auth
+
 	recordRepo := authentication.NewRecordRepository(db)
 	authService := authentication.NewAuthenticationService(
 		personService,
 		recordRepo,
 		logger,
+		// access token settings
 		cfg.Token.AccessTokenSecret,
 		15*time.Minute,
+		// refresh token settings
+		cfg.Token.RefreshTokenSecret,
 		time.Duration(cfg.Token.RefreshTokenExpiry)*time.Hour,
 	)
 
-	// mount auth endpoints
 	api := router.Group("/api/v1")
 	authentication.NewAuthHandler(api, authService, logger)
 
-	// public health
 	api.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
 
-	// any authenticated user → /persons/me
 	authGroup := api.Group("/")
 	authGroup.Use(
 		authentication.AuthMiddleware(personService, cfg.Token.AccessTokenSecret, logger),
@@ -100,7 +98,6 @@ func main() {
 		c.JSON(http.StatusOK, user)
 	})
 
-	// admin-only CRUD on /persons
 	adminGroup := api.Group("/")
 	adminGroup.Use(
 		authentication.AuthMiddleware(personService, cfg.Token.AccessTokenSecret, logger),

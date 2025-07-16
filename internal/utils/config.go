@@ -1,10 +1,15 @@
 package utils
 
 import (
+	"errors"
 	"os"
 	"strconv"
 
 	"github.com/joho/godotenv"
+)
+
+var (
+	ErrAccessTokenTooShort = errors.New("access token too short")
 )
 
 type DatabaseConfig struct {
@@ -70,6 +75,13 @@ func LoadConfig(dotenvPath string) (*Config, error) {
 			}
 			return expiry
 		}(),
+	}
+
+	if len(tokenCfg.AccessTokenSecret) < 32 {
+		panic("access token too short. must be at least 32 characters")
+	}
+	if len(tokenCfg.RefreshTokenSecret) < 32 {
+		panic("refresh token too short. must be at least 32 characters")
 	}
 
 	cfg := &Config{dbCfg, serverCgf, adminCfg, tokenCfg}
