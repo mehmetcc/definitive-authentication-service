@@ -77,7 +77,7 @@ func LoadConfig(dotenvPath string) (*Config, error) {
 			return expiry
 		}(),
 		AccessTokenExpiry: func() int {
-			expiry, err := strconv.Atoi(os.Getenv("REFRESH_TOKEN_EXPIRY"))
+			expiry, err := strconv.Atoi(os.Getenv("ACCESS_TOKEN_EXPIRY"))
 			if err != nil {
 				return 24 // default to 2 minutes if parsing fails
 			}
