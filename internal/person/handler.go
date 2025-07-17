@@ -249,7 +249,7 @@ func (h *PersonHandler) UpdatePassword(c *gin.Context) {
 	switch {
 	case err == nil:
 		c.Status(http.StatusNoContent)
-	case errors.Is(err, ErrPasswordTooShort), errors.Is(err, ErrPasswordNotAlphanumeric):
+	case errors.Is(err, ErrPasswordShouldBeNCharacters), errors.Is(err, ErrPasswordNotAlphanumeric), errors.Is(err, ErrPasswordDoesNotHaveSpecialCharacter):
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid password format"})
 	case errors.Is(err, ErrPersonNotFound):
 		c.JSON(http.StatusNotFound, gin.H{"error": "person not found"})

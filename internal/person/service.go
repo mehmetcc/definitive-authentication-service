@@ -4,20 +4,15 @@ import (
 	"context"
 	"errors"
 	"net/mail"
-	"regexp"
 	"time"
 
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 )
 
-var passwordValidationRegex = regexp.MustCompile(`^[a-zA-Z0-9]*$`)
-
 var (
-	ErrHashingPasswordFailed   = errors.New("hashing password failed")
-	ErrPasswordTooShort        = errors.New("password must be at least 8 characters long")
-	ErrPasswordNotAlphanumeric = errors.New("password must contain at least one letter and one number")
-	ErrInvalidEmailFormat      = errors.New("invalid email format")
+	ErrHashingPasswordFailed = errors.New("hashing password failed")
+	ErrInvalidEmailFormat    = errors.New("invalid email format")
 )
 
 type validationTarget struct {
@@ -91,15 +86,10 @@ func (s *personService) validateEmail(email string) error {
 }
 
 func (s *personService) validatePassword(password string) error {
-	if len(password) < 8 {
-		return ErrPasswordTooShort
+	err := CheckPassword(password)
+	if err != nil {
+		return err
 	}
-
-	is_alphanumeric := passwordValidationRegex.MatchString(password)
-	if !is_alphanumeric {
-		return ErrPasswordNotAlphanumeric
-	}
-
 	return nil
 }
 

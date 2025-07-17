@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -58,6 +59,7 @@ func NewAuthenticationService(
 }
 
 func (a *authenticationService) Login(ctx context.Context, email, password string) (string, string, error) {
+	// 1) Validate credentials
 	user, err := a.personService.ReadPersonByEmail(ctx, email)
 	if err != nil {
 		if errors.Is(err, person.ErrPersonNotFound) {
@@ -69,7 +71,7 @@ func (a *authenticationService) Login(ctx context.Context, email, password strin
 		return "", "", ErrInvalidCredentials
 	}
 
-	// 1) Issue Access Token
+	// 2) Issue Access Token
 	accessJWT, err := utils.IssueAccessToken(
 		strconv.Itoa(int(user.ID)),
 		user.Role,
@@ -80,27 +82,36 @@ func (a *authenticationService) Login(ctx context.Context, email, password strin
 		return "", "", err
 	}
 
-	// 2) Issue Refresh Token (JWT)
-	jti := uuid.NewString()
-	refreshJWT, err := utils.IssueRefreshToken(
-		strconv.Itoa(int(user.ID)),
-		jti,
-		a.refreshSecret,
-		a.refreshTokenTTL,
-	)
-	if err != nil {
-		return "", "", err
-	}
+	// 3) Generate & store Refresh Token with retry-on-duplicate
+	var refreshJWT string
+	for {
+		jti := uuid.NewString()
+		sum := sha256.Sum256([]byte(jti))
+		rec := &RefreshTokenRecord{
+			PersonID:     user.ID,
+			RefreshToken: hex.EncodeToString(sum[:]),
+			ExpiresAt:    time.Now().Add(a.refreshTokenTTL),
+		}
 
-	// 3) Store hashed JTI in DB
-	hash := sha256.Sum256([]byte(jti))
-	rec := &RefreshTokenRecord{
-		PersonID:     user.ID,
-		RefreshToken: hex.EncodeToString(hash[:]),
-		ExpiresAt:    time.Now().Add(a.refreshTokenTTL),
-	}
-	if err := a.recordRepo.Create(ctx, rec); err != nil {
-		return "", "", err
+		if err := a.recordRepo.Create(ctx, rec); err != nil {
+			if strings.Contains(err.Error(), "duplicate key") {
+				// Collision—try a new JTI
+				continue
+			}
+			return "", "", err
+		}
+
+		// Only issue the JWT once the DB row is secured
+		refreshJWT, err = utils.IssueRefreshToken(
+			strconv.Itoa(int(user.ID)),
+			jti,
+			a.refreshSecret,
+			a.refreshTokenTTL,
+		)
+		if err != nil {
+			return "", "", err
+		}
+		break
 	}
 
 	return accessJWT, refreshJWT, nil
